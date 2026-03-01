@@ -1,0 +1,29 @@
+# Credentials — never commit these
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Logs & temp files
+*.log
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
