@@ -24,7 +24,7 @@ CLI to control Hoymiles inverters with ESS battery through the [neapi.hoymiles.c
 pip install requests python-dotenv
 ```
 
-## Quick start: discover your identifiers
+## Quick start: credentials setup, discovering your identifiers
 
 > ⚠️ **This command is designed for a single-inverter + single-battery setup (no microinverters).**
 > It uses the `pvm/api/0/dev/dtu/select_all` endpoint, which returns ESS/HAS inverters correctly.
@@ -56,8 +56,6 @@ HOYMILES_DTU_SN=430123526317
 ```
 
 Copy the output into your `.env` file and replace `<your_plain_text_password>` with your real password.
-
-## Credentials setup
 
 **Option 3 — fill in `examples/env.example` manually** (if you already know your identifiers):
 
