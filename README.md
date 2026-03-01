@@ -24,9 +24,42 @@ CLI to control Hoymiles inverters with ESS battery through the [neapi.hoymiles.c
 pip install requests python-dotenv
 ```
 
+## Quick start: discover your identifiers
+
+> ⚠️ **This command is designed for a single-inverter + single-battery setup (no microinverters).**
+> It uses the `pvm/api/0/dev/dtu/select_all` endpoint, which returns ESS/HAS inverters correctly.
+> If you have microinverters, the results may be incomplete or incorrect.
+
+Run `--init` with just your username and password — it logs in, queries your account, and generates a ready-to-use `.env` block with all the identifiers you need.
+
+**Option 1 — redirect directly to `.env` (recommended):**
+
+```bash
+./hoymiles_cli.py -u you@example.com -p secret --init > .env
+```
+
+Then open `.env` and replace `<your_plain_text_password>` with your real password.
+
+**Option 2 — print to screen and copy manually:**
+
+```bash
+./hoymiles_cli.py -u you@example.com -p secret --init
+```
+
+```ini
+# Station: Sub (id=9258040)
+HOYMILES_USERNAME=you@example.com
+HOYMILES_PASSWORD=<your_plain_text_password>
+HOYMILES_STATION_ID=9258040
+HOYMILES_DEV_SN=208324250511
+HOYMILES_DTU_SN=430123526317
+```
+
+Copy the output into your `.env` file and replace `<your_plain_text_password>` with your real password.
+
 ## Credentials setup
 
-Copy `examples/env.example` to `.env` and fill in your values:
+**Option 3 — fill in `examples/env.example` manually** (if you already know your identifiers):
 
 ```bash
 cp examples/env.example .env
@@ -216,6 +249,7 @@ ${basedir}/../hoymiles_cli.py --env-file "$basedir/../.env" --pretty
 | `--realtime` | Get station real-time data |
 | `--battery` | Get battery mode and reserve SOC via pvm-ctl (may require permissions) |
 | `--battery-from-realtime` | Get battery SOC and power from realtime endpoint (most compatible) |
+| `--init` | Discover station ID, device SN and DTU SN and print a ready-to-use `.env` block |
 | `--list-stations` | List all stations in the account |
 | `--all` | Stations + realtime + all microinverters |
 | `--pretty` | Pretty-print JSON output |
@@ -223,16 +257,6 @@ ${basedir}/../hoymiles_cli.py --env-file "$basedir/../.env" --pretty
 | `--poll-timeout N` | Maximum timeout per polling phase in seconds (default 60) |
 | `--timeout N` | HTTP timeout in seconds (default 25) |
 | `--insecure` | Disable TLS verification (not recommended) |
-
----
-
-## Finding your `dev_sn` and `dtu_sn`
-
-Open the Hoymiles web dashboard, navigate to the ESS settings page, open the browser developer tools (F12 -> Network) and look for the request to `/pvm-ctl/api/0/dev/config/fetch`. The request body will contain:
-
-```json
-{"cfg_type": 0, "dev_sn": "208324250511", "dtu_sn": "430123526317"}
-```
 
 ---
 

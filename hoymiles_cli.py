@@ -95,6 +95,7 @@ API_STATIONS_URL = f"{API_BASE_URL}/pvm/api/0/station/select_by_page"
 API_REAL_TIME_DATA_URL = f"{API_BASE_URL}/pvm-data/api/0/station/data/count_station_real_data"
 API_MICROINVERTERS_URL = f"{API_BASE_URL}/pvm/api/0/dev/micro/select_by_station"
 API_MICRO_DETAIL_URL = f"{API_BASE_URL}/pvm/api/0/dev/micro/find"
+API_DTU_SELECT_ALL_URL = f"{API_BASE_URL}/pvm/api/0/dev/dtu/select_all"
 
 API_BATTERY_SETTINGS_STATUS_URL = f"{API_BASE_URL}/pvm-ctl/api/0/dev/setting/status"
 API_BATTERY_SETTINGS_READ_URL = f"{API_BASE_URL}/pvm-ctl/api/0/dev/setting/read"
@@ -248,6 +249,18 @@ class HoymilesClient:
         payload = {"sid": int(station_id), "page_size": 1000, "page_num": 1, "show_warn": 0}
         resp = self._post(API_MICROINVERTERS_URL, payload, auth=True)
         return resp.get("data") or {}
+
+    def dtu_select_all(self, station_id: str) -> list:
+        """Return the list of DTU+inverter entries for the station.
+
+        Each entry has the shape:
+            {"dtu": {"sn": "430123526317", ...},
+             "repeater_list": [{"inv_sn": "208324250511", ...}]}
+        This is the reliable way to get dev_sn and dtu_sn for ESS/HAS devices,
+        which do not appear in the micro_list endpoint.
+        """
+        resp = self._post(API_DTU_SELECT_ALL_URL, {"id": int(station_id)}, auth=True)
+        return resp.get("data") or []
 
     def micro_details(self, station_id: str, micro_id: str) -> Dict[str, Any]:
         resp = self._post(API_MICRO_DETAIL_URL, {"id": int(micro_id), "sid": int(station_id)}, auth=True)
@@ -619,6 +632,8 @@ def main() -> int:
     p.add_argument("--insecure", action="store_true", help="Disable TLS verification (not recommended)")
     p.add_argument("--pretty", action="store_true", help="Pretty-print JSON")
     p.add_argument("--list-stations", action="store_true", help="List station IDs and names")
+    p.add_argument("--init", action="store_true",
+                   help="Discover station ID, device SN and DTU SN from the account and print a ready-to-use .env block")
     p.add_argument("--realtime", action="store_true", help="Get station real-time data")
     p.add_argument("--micro-list", action="store_true", help="List microinverters for the station (basic list)")
     p.add_argument("--micro-detail", action="store_true", help="Get microinverter detail (requires --micro-id)")
@@ -777,11 +792,54 @@ def main() -> int:
         out["battery_realtime"] = client.battery_from_realtime(sid)
 
 
+    # --init: discover and print .env block
+    if args.init:
+        stations = client.list_stations()
+        if not stations:
+            raise HoymilesClientError("No stations found for this account.")
+
+        env_blocks = []
+        for sid, name in stations.items():
+            dtu_list = client.dtu_select_all(sid)
+
+            dev_sn = None
+            dtu_sn = None
+            for entry in dtu_list:
+                dtu = entry.get("dtu") or {}
+                if not dtu_sn:
+                    dtu_sn = dtu.get("sn")
+                for repeater in entry.get("repeater_list") or []:
+                    if not dev_sn:
+                        dev_sn = repeater.get("inv_sn") or repeater.get("sn")
+
+            block = (
+                f"# Station: {name} (id={sid})\n"
+                f"HOYMILES_USERNAME={args.username}\n"
+                f"HOYMILES_PASSWORD=<your_plain_text_password>\n"
+                f"HOYMILES_STATION_ID={sid}\n"
+                f"HOYMILES_DEV_SN={dev_sn or '<not found>'}\n"
+                f"HOYMILES_DTU_SN={dtu_sn or '<not found>'}\n"
+            )
+            env_blocks.append({
+                "station": name,
+                "station_id": sid,
+                "dev_sn": dev_sn,
+                "dtu_sn": dtu_sn,
+                "env_block": block,
+            })
+
+        if args.pretty:
+            print(json.dumps(env_blocks, ensure_ascii=False, indent=2))
+        else:
+            for b in env_blocks:
+                print(b["env_block"])
+        return 0
+
     # Default behavior if no flags: return basic set (stations + realtime + all micro details for first station)
     if not any([args.list_stations, args.realtime, args.micro_list, args.micro_detail,
                 args.micro_details, args.all, args.set_mode is not None,
                 args.set_max_discharging_power is not None, args.get_max_discharging_power,
-                args.get_dev_config, args.debug_config]):
+                args.get_dev_config, args.debug_config, args.init]):
         sid = _pick_station_id(client, args.station_id)
         out = {
             "stations": client.list_stations(),
